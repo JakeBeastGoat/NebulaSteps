@@ -18,7 +18,7 @@ type SelectStepsRouteProp = RouteProp<RootStackParamList, 'SelectSteps'>;
 export default function SelectStepsScreen() {
     const navigation = useNavigation<NavigationProp>();
     const route = useRoute<SelectStepsRouteProp>();
-    const addChallenge = useChallengeStore((state) => state.addChallenge);
+    const saveMainTaskToSupabase = useChallengeStore((state) => state.saveMainTaskToSupabase);
 
     const { obstacle, generatedSteps } = route.params;
 
@@ -30,6 +30,7 @@ export default function SelectStepsScreen() {
 
     const [targetDate, setTargetDate] = useState<Date | undefined>(undefined);
     const [showDatePicker, setShowDatePicker] = useState(false);
+    const [isSaving, setIsSaving] = useState(false);
 
     const toggleSelection = (index: number) => {
         const newSet = new Set(selectedIndices);
@@ -57,9 +58,14 @@ export default function SelectStepsScreen() {
         }
     };
 
-    const handleSave = () => {
+    const handleSave = async () => {
         const selectedSteps = allSteps.filter((_, idx) => selectedIndices.has(idx));
-        addChallenge(obstacle, selectedSteps, targetDate?.getTime());
+        setIsSaving(true);
+        try {
+            await saveMainTaskToSupabase(obstacle, selectedSteps, targetDate?.getTime());
+        } finally {
+            setIsSaving(false);
+        }
         navigation.popToTop();
     };
 

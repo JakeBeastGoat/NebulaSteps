@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { View, Text, StyleSheet, FlatList, SafeAreaView } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -14,6 +14,11 @@ type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
 export default function HomeScreen() {
     const navigation = useNavigation<NavigationProp>();
     const challenges = useChallengeStore((state) => state.challenges);
+    const fetchChallenges = useChallengeStore((state) => state.fetchChallenges);
+
+    useEffect(() => {
+        fetchChallenges();
+    }, []);
 
     return (
         <AnimatedBackground>

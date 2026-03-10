@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, Alert } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RouteProp } from '@react-navigation/native';
@@ -15,17 +15,10 @@ import { BrainCircuit } from 'lucide-react-native';
 import { RootStackParamList } from '../types';
 import AnimatedBackground from '../components/AnimatedBackground';
 import { colors } from '../theme/colors';
+import { supabase } from '../supabase';
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList, 'GeneratingSteps'>;
 type GeneratingStepsRouteProp = RouteProp<RootStackParamList, 'GeneratingSteps'>;
-
-const MOCK_STEPS = [
-    "Take 5 minutes to gather your thoughts and breathe.",
-    "Write down the top 3 small things that are blocking you right now.",
-    "Pick the easiest task out of the 3 and complete it within 10 minutes.",
-    "Review your progress and reward yourself for taking the first step.",
-    "Communicate with someone you trust about your current feelings.",
-];
 
 export default function GeneratingStepsScreen() {
     const navigation = useNavigation<NavigationProp>();
@@ -54,15 +47,55 @@ export default function GeneratingStepsScreen() {
             true
         );
 
-        // Mock API call delay (3 seconds)
-        const timeout = setTimeout(() => {
-            navigation.replace('SelectSteps', {
-                obstacle,
-                generatedSteps: MOCK_STEPS
-            });
-        }, 3000);
+        // Call the generate-subtasks Edge Function
+        let cancelled = false;
 
-        return () => clearTimeout(timeout);
+        const generateSubtasks = async () => {
+            try {
+                const { data, error } = await supabase.functions.invoke('generate-subtasks', {
+                    body: { task_title: obstacle },
+                });
+
+                if (cancelled) return;
+
+                if (error) {
+                    console.error('Edge function error:', error);
+                    Alert.alert(
+                        'Generation Failed',
+                        'Could not generate steps. Please try again.',
+                        [{ text: 'OK', onPress: () => navigation.goBack() }]
+                    );
+                    return;
+                }
+
+                const subtasks: string[] = data?.subtasks;
+                if (!subtasks || !Array.isArray(subtasks) || subtasks.length === 0) {
+                    Alert.alert(
+                        'No Steps Generated',
+                        'The AI returned no steps. Please try again with a different challenge.',
+                        [{ text: 'OK', onPress: () => navigation.goBack() }]
+                    );
+                    return;
+                }
+
+                navigation.replace('SelectSteps', {
+                    obstacle,
+                    generatedSteps: subtasks,
+                });
+            } catch (err) {
+                if (cancelled) return;
+                console.error('Unexpected error:', err);
+                Alert.alert(
+                    'Error',
+                    'Something went wrong. Please try again.',
+                    [{ text: 'OK', onPress: () => navigation.goBack() }]
+                );
+            }
+        };
+
+        generateSubtasks();
+
+        return () => { cancelled = true; };
     }, []);
 
     const animatedIconStyle = useAnimatedStyle(() => ({
